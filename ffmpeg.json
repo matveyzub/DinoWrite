@@ -1,0 +1,18 @@
+{
+    "readme":"Adjust ffmpeg settings",
+    "cmd":[
+        "ffmpeg",
+        "-y",
+        "-colorspace bt709",
+        "-r {fps}",
+        "-start_number {start_frame}",
+        "-i {input}",
+        "-s {resolution}",
+        "-aspect {aspect}",
+        "-c:v libx264",
+        "-crf 25",
+        "-pix_fmt yuv420p",
+        "-preset slow",
+        "{output}"
+    ]
+}
