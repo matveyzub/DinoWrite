@@ -4,6 +4,10 @@ from pathlib import Path
 import subprocess
 from os import environ as osenviron
 
+def logger(message,len=40):
+    print(" Flipbook Writer ".center(len,"-"))
+    print(message)
+    print(f"{'-'*len}")
 
 class StyleSheet:
     def __init__(self, config_path: str) -> None:
@@ -28,8 +32,14 @@ class StyleSheet:
             return data[element]
 
 class FFmpeg:
-    def __init__(self, config_path: str, bin: str) -> None:
+    def __init__(self, config_path: str, bin: str,cmd: dict) -> None:
+        
         self.config_path = config_path
+        self.cmdvar = cmd
+
+        if not config_path and not cmd:
+            logger("No config path or cmd set")
+            return 0
 
         path = osenviron["PATH"]
         osenviron["PATH"] = f"{bin};{path}"
@@ -37,24 +47,30 @@ class FFmpeg:
     def cmd(self, fps=24, resolution="1920x1080", aspect=1, start_frame=1001, input="", output="") -> list:
 
         if input == "" or output == "":
-            print("No input or output set")
+            logger("No input or output set")
             return 0
 
-        data = {}
-        with open(self.config_path) as cmd:
-            data = json.load(cmd)
-
         commands = []
-        for key in data['cmd']:
-            nkey = key.format(fps=fps, resolution=resolution, aspect=aspect,
-                              start_frame=start_frame, input=input, output=output)
-            commands += nkey.split(" ")
+        if not self.cmdvar:
+            data = {}
+            with open(self.config_path) as cmd:
+                data = json.load(cmd)
+
+            for key in data['cmd']:
+                nkey = key.format(fps=fps, resolution=resolution, aspect=aspect,
+                                start_frame=start_frame, input=input, output=output)
+                commands += nkey.split(" ")
+        else:
+            for key in self.cmdvar:
+                nkey = key.format(fps=fps, resolution=resolution, aspect=aspect,
+                                start_frame=start_frame, input=input, output=output)
+                commands += nkey.split(" ")
 
         return commands
 
     def convert_to_video(self, fps=24, resolution="1920x1080", aspect=1, start_frame=1001, input="", output="", delete_input=False):
         ffmpeg_cmd = self.cmd(fps=fps, resolution=resolution, aspect=aspect,
-                              start_frame=start_frame, input=input, output=output)
+                            start_frame=start_frame, input=input, output=output)
 
         folder = Path(input).parent
         if folder.exists():
@@ -65,21 +81,21 @@ class FFmpeg:
         try:
             subprocess.run(ffmpeg_cmd, check=True, shell=True)
         except subprocess.CalledProcessError as e:
-            print("\nError occured during subprocces run ffmpeg command")
-            print(f"\nError log: {e}")
+            logger(f"Error occured during subprocces run ffmpeg command\n\nErrorLog:\n{e}")
+            return 0
 
         if len(files) != 0 and delete_input:
             for file in files:
                 file.unlink()
 
 class HouViewport:
-    def __init__(self) -> None:
+    def __init__(self,kwargs) -> None:
         self.viewport_panetab = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
 
         if hou.ui.paneTabOfType(hou.paneTabType.SceneViewer,1):
-            print("Multiple SceneViewers Detected!\nPlease leave only one to make sure the tool take necessary")
+            self.viewport_panetab = kwargs.get("pane")
 
-        self.viewport_pane =     self.viewport_panetab.pane()
+        self.viewport_pane = self.viewport_panetab.pane()
         self.settings = self.viewport_panetab.curViewport().settings()
 
     def startFlipbook(self,options):
@@ -112,7 +128,7 @@ class HouViewport:
             resx = camera.evalParm("resx")
             resy = camera.evalParm("resy")
         else:
-            print("\nNo Camera Found in viewport\n Returning resolution from viewport size\n")
+            logger("No Camera Found in viewport\nReturning resolution from viewport size")
             size = viewport.size()
             resx = size[2]
             resy = size[3]
@@ -124,7 +140,7 @@ class HouViewport:
         if camera:
             aspect = camera.evalParm("aspect")
         else:
-            print("\nNo Camera Found in viewport\nReturning aspect 1\n")
+            logger("No Camera Found in viewport\nReturning aspect 1")
             aspect = 1
         return aspect
 

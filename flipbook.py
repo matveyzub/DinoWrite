@@ -5,23 +5,29 @@ from .utils import utils
 
 import subprocess
 import hou
+import json
 
 reload(utils)
 
-def start(settingsjson, datajson):
+def start(data,kwargs):
+
+    settingsfile = load_json(Path(__file__).parent / "settings.json")
+    paths = settingsfile["paths"]
+    advanced = settingsfile["advanced"]
+    ffmpeg_cmd = settingsfile["ffmpeg_cmd"]
+
     # Parsing settings
-    fb_name = settingsjson.get("fb_name")
+    fb_name =      paths.get("fb_name")
+    fb_video_ext = paths.get("fb_video_ext")
+    fb_folder = hou.text.expandString(paths.get("fb_folder"))
+
     frame_padding = search(r"\$F\d+",fb_name)
     if not frame_padding:
-        print("No frame padding like '$F4' in 'fb_name' found")
+        utils.logger("No frame padding like '$F4' in 'fb_name' found")
         return 0
     else:
         frame_padding = frame_padding[0]
         frame_padding_int = frame_padding.replace("$F","").zfill(2)
-
-    fb_video_ext = settingsjson.get("fb_video_ext")
-    fb_folder = hou.text.expandString(settingsjson.get("fb_folder"))
-    data = datajson
 
     # Parsing data
     file_name = data.get("name")
@@ -32,12 +38,12 @@ def start(settingsjson, datajson):
         "framestart").startswith("$") else hou.hscriptExpression(data.get("framestart"))
     frame_end = int(data.get("frameend")) if not data.get("frameend").startswith(
         "$") else hou.hscriptExpression(data.get("frameend"))
+    frame_end = max(frame_start,frame_end)
 
     # Default path to write flipbook
-    write_folder = Path(fb_folder.format(name=file_name))
-    if write_folder.exists():
-        pass
-    else:
+    write_folder = Path(fb_folder.format(name=file_name)).resolve()
+    
+    if not write_folder.exists():
         write_folder.mkdir(parents=True, exist_ok=True)
 
     # Get newer folder version of flipbook
@@ -56,7 +62,7 @@ def start(settingsjson, datajson):
     output_filepath = write_folder / ver_str / filename
 
     # Get Viewport
-    viewport = utils.HouViewport()
+    viewport = utils.HouViewport(kwargs)
 
     # Stash flipbook settings
     flipbook_options = viewport.flipbook_settings()
@@ -104,15 +110,26 @@ def start(settingsjson, datajson):
     # Return background image
     if data.get("bgimage"):
         viewport.displayBackgroundImage()
-    
-    if data.get("convertvideo"):
+
+    files_keeped=True
+    if advanced['delete_incomplete_fb']:
+        fb_length = frame_end - frame_start + 1
+        files = [x for x in output_filepath.parent.iterdir()]
+        
+        if len(files)<fb_length-10: #extra padding in 10 frames
+            [x.unlink() for x in files]
+            output_filepath.parent.rmdir()
+            files_keeped=False
+
+    if data.get("convertvideo") and files_keeped:
         fps = int(hou.fps())
         aspect = int(data.get("aspect"))
         resolution = f"{file_resolution[0]}x{file_resolution[1]}"
         start_frame = int(frame_start)
 
-        ffmpeg = utils.FFmpeg(Path(__file__).parent / "ffmpeg.json",
-                            Path(__file__).parent / "bin" / "ffmpeg.exe")
+        ffmpeg = utils.FFmpeg(config_path=None,
+                            bin=Path(__file__).parent / "bin",
+                            cmd=ffmpeg_cmd)
 
         input_files = output_filepath.as_posix().replace(frame_padding, f"%{frame_padding_int}d")
         output_video = (output_filepath.parent /
@@ -124,4 +141,11 @@ def start(settingsjson, datajson):
                                 start_frame=start_frame,
                                 input=input_files,
                                 output=output_video,
-                                delete_input=True)
+                                delete_input=advanced['conversion_delete_input_sequence'])
+
+def load_json(file):
+    try:
+        with open(file, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
