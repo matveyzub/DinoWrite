@@ -1,3 +1,51 @@
+'''
+DinoWrite UI File
+
+'''
+
+# CONSTANTs
+TITLE = "DinoWrite"
+VERSION = "1.2.0"
+BRANCH = "dev"
+WINDOW_TITLE = f"{TITLE} - {VERSION} - {BRANCH}"
+
+WINDOW_WIDTH = 400
+WINDOW_HIGHT = 320
+WIDTH_OFFSET = 20
+HIGHT_OFFSET = 90
+
+MIN_RESOLUTION_X = 128
+MIN_RESOLUTION_Y = 128
+
+FILENAME_DEFAULT = "flipbook"
+FILENAME_HINT = "Flipbook name"
+
+RESOLUTION_X_DEFAULT = "1920"
+RESOLUTION_X_HINT = "Width"
+
+RESOLUTION_Y_DEFAULT = "1080"
+RESOLUTION_Y_HINT = "Height"
+
+FRAME_START_DEFAULT = "$FSTART"
+FRAME_START_HINT = "Start frame"
+
+FRAME_END_DEFAULT = "$FEND"
+FRAME_END_HINT = "End frame"
+
+FILE_FORMAT_DEFAULT = "exr"
+
+CONVERT_VIDEO_DEFAULT = False
+BLACK_BACKGROUND_DEFAULT = True
+OFF_BACKGROUND_IMAGE_DEFAULT = True
+OPEN_WRITE_FOLDER_DEFAULT = True
+
+FRAME_RANGES_DROPDOWN_DICT =  { "Global Frame Range":"$FSTART $FEND",
+                                "Playbar Frame Range":"$RFSTART $RFEND",
+                                "---":""}
+FRAME_RANGES_COMPLETER_LIST = ['$F','$FSTART','$FEND','$RFSTART','$RFEND']
+RESOLUTION_DROPDOWN_LIST =    ["Camera Resolution", "50%", "---"]
+
+# IMPORTs
 from PySide2 import QtCore
 from PySide2 import QtGui
 from PySide2 import QtWidgets
@@ -15,78 +63,113 @@ reload(flipbook)
 reload(qt_windows)
 reload(utils)
 
-class flipbook_menu(QtWidgets.QDialog):
+# Functions
+def qtCompleter(array:list) -> QtWidgets.QCompleter: 
+    completer = QtWidgets.QCompleter(array)
+    completer.setCaseSensitivity(QtGui.Qt.CaseInsensitive)
+    completer.setCompletionMode(QtWidgets.QCompleter.InlineCompletion)
+    return completer
+
+# Main Class
+class flipbook_menu(QtWidgets.QWidget):
 
     def __init__(self,kwargs):
         super().__init__(hou.qt.mainWindow())
 
-        self.setWindowTitle("Write flipbook")
-        self.setGeometry(300, 300, 400, 300)
-        self.setMaximumSize(QtCore.QSize(400, 350))
-        # self.setWindowIcon(QtGui.QIcon((Path(__file__).parent / "icons" / "appicon.png").as_posix()))
+        self.Icons = utils.Icons()
+        self.hou_viewport = utils.HouViewport(kwargs)
+        self.kwargs = kwargs
+
+        self.setWindowTitle(WINDOW_TITLE)
+        self.setWindowFlags(QtCore.Qt.Window)
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.setFixedWidth(WINDOW_WIDTH)
+        self.setFixedHeight(WINDOW_HIGHT)
+        self.setWindowIcon(self.Icons.getRandom())
+
+        # Set proper window pos
+        mouse_pos = QtGui.QCursor.pos()
+        screen = QtWidgets.QDesktopWidget().screenNumber(mouse_pos)
+        screenGeometry = QtWidgets.QDesktopWidget().screenGeometry(screen)
+        xpoint = min( max(mouse_pos.x()-WINDOW_WIDTH/2,screenGeometry.x() + WIDTH_OFFSET) , screenGeometry.x() + screenGeometry.width() - WINDOW_WIDTH - WIDTH_OFFSET )
+        ypoint = min(mouse_pos.y()-WINDOW_HIGHT/2+HIGHT_OFFSET,screenGeometry.height()-WINDOW_HIGHT-100)
+        self.move(QtCore.QPoint(xpoint,ypoint))
 
         settingsfile = self.load_json(Path(__file__).parent / "settings.json")
         self.paths = settingsfile["paths"]
         self.formats = settingsfile["formats"]
-        self.addresolution = settingsfile["addresolution"]
-        self.addframerange = settingsfile["addframerange"]
+        self.addresolution = settingsfile["custom_resolution"]
+        self.addframerange = settingsfile["custom_framerange"]
 
         self.data = self.load_json(Path(self.get_tmp(), self.paths.get("tmp_data")))
-        self.hou_viewport = utils.HouViewport(kwargs)
-        self.kwargs = kwargs
 
         self.initUI()
 
     def initUI(self):
         # WIDGETS
+
+        ### FIRST LINE
         label_filename =   qt_windows.MainLabel("Name")
-        self.filename =    qt_windows.LineEdit(self.read_data("name", "flipbook"),hint="Flipbook name")
+        self.filename =    qt_windows.LineEdit(self.read_data("name", FILENAME_DEFAULT),hint=FILENAME_HINT)
+        self.filename.setCompleter(qtCompleter(self.flipbooks_menu()))
+        # self.filename.installEventFilter(self)
+
         self.menu_button = qt_windows.DropDownButton(
             menu=self.flipbooks_menu(), callback=self.setMenuItemFile)
-        
-        self.filename.installEventFilter(self)
 
+        ### SECOND LINE
         label_res = qt_windows.MainLabel("Resolution")
-        self.resx = qt_windows.LineEdit(self.read_data("resx", "1920"),hint="Height")
-        self.resy = qt_windows.LineEdit(self.read_data("resy", "1080"),hint="Width")
-        self.res_menu = qt_windows.DropDownButton(
-            menu=["Camera Resolution", "50%", "---"] + self.addresolution, callback=self.setMenuItemResolution)
-        
-        self.resx.installEventFilter(self)
-        self.resy.installEventFilter(self)
-
+        self.resx = qt_windows.LineEdit(self.read_data("resx", RESOLUTION_X_DEFAULT),hint=RESOLUTION_X_HINT)
         self.resx.setValidator(QtGui.QIntValidator())
+        self.resx.setCompleter(qtCompleter([x.split(" ")[0] for x in self.addresolution]))
+        # self.resx.installEventFilter(self)
+
+        self.resy = qt_windows.LineEdit(self.read_data("resy", RESOLUTION_Y_DEFAULT),hint=RESOLUTION_Y_HINT)
         self.resy.setValidator(QtGui.QIntValidator())
+        self.resy.setCompleter(qtCompleter([x.split(" ")[1] for x in self.addresolution]))
+        # self.resy.installEventFilter(self)
 
-        label_range = qt_windows.MainLabel("Frame Range")
-        self.framestart = qt_windows.LineEdit(
-            self.read_data("framestart", "$FSTART"),hint="Start Frame")
-        self.frameend = qt_windows.LineEdit(
-            self.read_data("frameend", "$FEND"),hint="End Frame")
-        self.frame_menu = qt_windows.DropDownButton(
-            menu=self.addframerange.keys(), callback=self.setMenuItemFrameRange)
-        
-        self.framestart.installEventFilter(self)
-        self.frameend.installEventFilter(self)
+        self.res_menu = qt_windows.DropDownButton(
+            menu=RESOLUTION_DROPDOWN_LIST + self.addresolution, callback=self.setMenuItemResolution)
 
+        ### THIRD LINE
+        label_range =     qt_windows.MainLabel("Frame Range")
+        self.framestart = qt_windows.LineEdit(self.read_data("framestart", FRAME_START_DEFAULT),hint=FRAME_START_HINT)
+        self.framestart.setCompleter(qtCompleter(FRAME_RANGES_COMPLETER_LIST))
+        # self.framestart.installEventFilter(self)
+
+        self.frameend =   qt_windows.LineEdit(self.read_data("frameend", FRAME_END_DEFAULT),hint=FRAME_END_HINT)
+        self.frameend.setCompleter(qtCompleter(FRAME_RANGES_COMPLETER_LIST))
+        # self.frameend.installEventFilter(self)
+
+        self.native_ranges = FRAME_RANGES_DROPDOWN_DICT
+        self.native_ranges.update(self.addframerange)
+        self.frame_menu = qt_windows.DropDownButton(menu=self.native_ranges.keys(), callback=self.setMenuItemFrameRange)
+
+        ### FOURTH LINE
         label_fileformat = qt_windows.MainLabel("File Format")
-        self.fileformat =  qt_windows.ComboBox(self.formats["pic_exts"],item=self.read_data("fileformat", "exr"))
+        self.fileformat =  qt_windows.ComboBox(self.formats["pic_exts"],item=self.read_data("fileformat", FILE_FORMAT_DEFAULT))
 
-        self.convertvideo = qt_windows.CheckBox(
-            "Convert to video",          self.read_data("convertvideo", False))
-        self.blackbackground = qt_windows.CheckBox(
-            "Switch to black background", self.read_data("blackbg", True))
+        ### CHECKBOXES
+        self.convertvideo =       qt_windows.CheckBox(
+            "Convert to video",self.read_data("convertvideo", CONVERT_VIDEO_DEFAULT))
+        self.blackbackground =    qt_windows.CheckBox(
+            "Switch to black background", self.read_data("blackbg", BLACK_BACKGROUND_DEFAULT))
         self.offbackgroundimage = qt_windows.CheckBox(
-            "Off Background Image",      self.read_data("bgimage", True))
-        self.openwritefolder = qt_windows.CheckBox(
-            "Open write folder",         self.read_data("openfolder", True))
+            "Off Background Image",self.read_data("bgimage", OFF_BACKGROUND_IMAGE_DEFAULT))
+        self.openwritefolder =    qt_windows.CheckBox(
+            "Open write folder",self.read_data("openfolder", OPEN_WRITE_FOLDER_DEFAULT))
         
         # self.convertvideo.installEventFilter(self)
 
+        ### MAIN BUTTON
         self.writebutton = qt_windows.PushButton("WRITE", default=True,size=qt_windows.main_fontsize+4)
 
+        ### COLOR FILENAME
+        self.label_name = qt_windows.ColorfulLabel("ice_fx.v002.$F4.exr")
+
         # LAYOUTS
-        grid = QtWidgets.QGridLayout()
+        grid =  QtWidgets.QGridLayout()
         boxv1 = QtWidgets.QVBoxLayout()
 
         grid.addWidget(label_filename, 0, 0)
@@ -115,32 +198,32 @@ class flipbook_menu(QtWidgets.QDialog):
         boxv1.addWidget(self.openwritefolder)
         boxv1.addWidget(qt_windows.QHLine())
         boxv1.addWidget(self.writebutton)
+        boxv1.addWidget(self.label_name)
 
         self.setLayout(boxv1)
 
         # SIGNALS
-        self.writebutton.clicked.connect(self.dump_json)
+        self.writebutton.clicked.connect(self.main)
 
         # SCRIPTS
         flipbook_widget = None
         for w in hou.qt.mainWindow().children():
             if w.isWidgetType():
-                if w.windowTitle()=="Write flipbook" and w.isVisible():
+                if w.windowTitle()==WINDOW_TITLE and w.isVisible():
                     flipbook_widget = w
 
         if flipbook_widget:
-            utils.logger("Flipbook Writer is already open")
+            utils.logger(f"{TITLE} is already open")
             flipbook_widget.activateWindow()
         else:
             self.show()
 
     def eventFilter(self, source , event) -> bool:
+        # if event.type() == QtCore.QEvent.FocusIn or event.type() == QtCore.QEvent.KeyRelease and event.key() not in [QtCore.Qt.Key_Return,QtCore.Qt.Key_Enter]:
+        #     self.writebutton.setDefault(False)
         
-        if event.type() == QtCore.QEvent.FocusIn or event.type() == QtCore.QEvent.KeyRelease and event.key() not in [QtCore.Qt.Key_Return,QtCore.Qt.Key_Enter]:
-            self.writebutton.setDefault(False)
-        
-        elif event.type() == QtCore.QEvent.KeyRelease and event.key() in [QtCore.Qt.Key_Return,QtCore.Qt.Key_Enter]:
-            self.writebutton.setDefault(True)
+        # elif event.type() == QtCore.QEvent.KeyRelease and event.key() in [QtCore.Qt.Key_Return,QtCore.Qt.Key_Enter]:
+        #     self.writebutton.setDefault(True)
 
         # if source==self.convertvideo and event.type()==QtCore.QEvent.MouseButtonRelease:
         #     if self.convertvideo.isChecked():
@@ -166,10 +249,8 @@ class flipbook_menu(QtWidgets.QDialog):
         elif item == "50%":
             resx = self.resx.text()
             resy = self.resy.text()
-
-            newresx = max(round(int(resx)/2), 128)
-            newresy = max(round(int(resy)/2), 128)
-
+            newresx = max(round(int(resx)/2), MIN_RESOLUTION_X)
+            newresy = max(round(int(resy)/2), MIN_RESOLUTION_Y)
             self.resx.setText(str(newresx))
             self.resy.setText(str(newresy))
         else:
@@ -179,7 +260,7 @@ class flipbook_menu(QtWidgets.QDialog):
 
     def setMenuItemFrameRange(self):
         item = self.sender().text()
-        start,end = self.addframerange[item].split()
+        start,end = self.native_ranges[item].split()
 
         self.framestart.setText(start)
         self.frameend.setText(end)
@@ -205,9 +286,23 @@ class flipbook_menu(QtWidgets.QDialog):
 
         return hou_temp.as_posix()
 
-    def dump_json(self):
-        hou_temp = self.get_tmp()
+    def main(self):
 
+        # Check lineedits validness
+        check_lines = [self.filename,self.resx,self.resy,self.framestart,self.frameend]
+        empty_array = []
+        string_of_empty = ""
+        for line in check_lines:
+            if len(line.text())==0:
+                empty_array.append(line.placeholderText())
+        if len(empty_array)>0:
+            for i,element in enumerate(empty_array):
+                string_of_empty += f"{str(i+1)}.{element}\n"
+            utils.hmsg(f"Empty line detected!\nPlease check values in:\n{string_of_empty}")
+            return 0
+
+        # Create data to store
+        hou_temp = self.get_tmp()
         data = {
             "name": self.filename.text(),
             "resx": self.resx.text(),
@@ -221,12 +316,11 @@ class flipbook_menu(QtWidgets.QDialog):
             "bgimage": self.offbackgroundimage.isChecked(),
             "openfolder": self.openwritefolder.isChecked()
         }
-
         data_file = Path(hou_temp, self.paths.get("tmp_data")).as_posix()
-
         with open(data_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
+        # Proceed hip and start flipbook script
         self.close()
         hou.hipFile.saveAndBackup()
         flipbook.start(data,self.kwargs)

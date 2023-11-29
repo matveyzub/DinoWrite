@@ -24,14 +24,60 @@ class MainLabel(QtWidgets.QLabel):
     """
     Label
     """
-    def __init__(self,label="",font=main_font,size=main_fontsize,parent=None) -> QtWidgets.QWidget:
+    def __init__(self,label="",font=main_font,size=main_fontsize,weight="bold",parent=None) -> QtWidgets.QWidget:
         super().__init__(parent)
 
+        weight_dict = {
+            "normal": QtGui.QFont.Medium,
+            "bold": QtGui.QFont.Bold
+        }
+
         self.setText(label)
-        self.setFont(QtGui.QFont(font,size,weight=QtGui.QFont.Bold))
+        self.setFont(QtGui.QFont(font,size,weight=weight_dict[weight]))
         self.setStyleSheet(styles.get("label"))
 
         self.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+
+class Label(QtWidgets.QLabel):
+    """
+    Label
+    """
+    def __init__(self,label="",font=main_font,size=main_fontsize,weight="bold",parent=None) -> QtWidgets.QWidget:
+        super().__init__(parent)
+
+        weight_dict = {
+            "normal": QtGui.QFont.Medium,
+            "bold": QtGui.QFont.Bold
+        }
+
+        self.setText(label)
+        self.setFont(QtGui.QFont(font,size,weight=weight_dict[weight]))
+        self.setStyleSheet(styles.get("label"))
+
+class ColorfulLabel(QtWidgets.QWidget):
+    """
+    Colorful label 
+    """
+    def __init__(self,label:str,font=main_font,size=main_fontsize,parent=None) -> QtWidgets.QWidget:
+        super().__init__(parent)
+
+        if not label:
+            utils.logger("Not name set in ColorfulLabel")
+
+        name,version,frame,ext = label.split(".")
+
+        self.name =    Label('',font=font,size=size,weight="normal")
+
+        self.name.setText(f"<font color=\"#74e796\")>{name}</font> - \
+                        <font color=\"#e3e774\")>{version}</font> - \
+                        <font color=\"#74c4e7\")>{frame}</font> - \
+                        <font color=\"#e77a74\")>{ext}</font>")
+
+        boxh = QtWidgets.QHBoxLayout()
+        boxh.addWidget(self.name)
+        boxh.setAlignment(QtCore.Qt.AlignCenter)
+        boxh.setContentsMargins(0,0,0,0)
+        self.setLayout(boxh)
 
 class LineEdit(QtWidgets.QLineEdit):
     """
@@ -47,7 +93,7 @@ class LineEdit(QtWidgets.QLineEdit):
         if hint:
             self.setPlaceholderText(hint)
 
-        self.editingFinished.connect(lambda: self.makeBold(spawntext,font,size))
+        # self.editingFinished.connect(lambda: self.makeBold(spawntext,font,size))
 
     def makeBold(self,spawntext,font,size):
         if spawntext!=self.text():
@@ -68,6 +114,7 @@ class DropDownButton(QtWidgets.QPushButton):
         self.setText(title if not icon else "")
         self.setFont(QtGui.QFont(font,size))
         self.setStyleSheet(styles.get("button"))
+
         self.setCheckable(True)
         self.setChecked(False)
 
@@ -77,7 +124,7 @@ class DropDownButton(QtWidgets.QPushButton):
         self.menu = QtWidgets.QMenu()
         self.menu.setFont(QtGui.QFont(font,size))
         self.menu.setStyleSheet(styles.get("menu"))
-        
+
         self.setMenu(self.menu)
         self.setFixedSize(QtCore.QSize(28,25))
 
@@ -106,7 +153,7 @@ class CheckBox(QtWidgets.QCheckBox):
         
         self.setText(label)
         self.setFont(QtGui.QFont(font,size))
-        # self.setStyleSheet(styles.get("checkbox"))
+        self.setStyleSheet(styles.get("checkbox"))
 
         self.setChecked(default)
 

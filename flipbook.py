@@ -91,11 +91,16 @@ def start(data,kwargs):
 
     # #Flipbook Settings
     flipbook_options.output(output_filepath.as_posix())
+    flipbook_options.outputToMPlay(True)
     flipbook_options.useResolution(True)
     flipbook_options.resolution(file_resolution)
+    # flipbook_options.cropOutMaskOverlay(True)
     flipbook_options.frameRange(tuple((frame_start, frame_end)))
+    flipbook_options.frameIncrement(1)
     flipbook_options.appendFramesToCurrent(False)
-    flipbook_options.beautyPassOnly(False)
+    # flipbook_options.beautyPassOnly(False)
+    # flipbook_options.renderAllViewports(False)
+    flipbook_options.antialias(hou.flipbookAntialias.HighQuality)
 
     # Start Flipbook
     viewport.startFlipbook(flipbook_options)

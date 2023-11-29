@@ -8,18 +8,16 @@
     },
     "formats":{
         "video_exts": ["mov","mp4"],
-        "pic_exts":   ["exr","png","jpg","tiff"]
+        "pic_exts":   ["exr","jpg"]
     },
-    "addresolution":[
+    "custom_resolution":[
         "3840 2160",
         "2048 1080",
         "2048 800",
         "1920 1080",
         "1280 720"
     ],
-    "addframerange":{
-        "Global Frame Range":"$FSTART $FEND",
-        "Playbar Frame Range":"$RFSTART $RFEND",
+    "custom_framerange":{
         "From Current Frame To Global End": "$F $FEND",
         "From Global Start To Current Frame": "$FSTART $F",
         "From Current Frame To Playbar End": "$F $RFEND",
