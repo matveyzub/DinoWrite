@@ -6,8 +6,7 @@ from os import environ as osenviron
 import random
 import shutil
 
-from PySide2.QtGui import QIcon,QPixmap
-from PySide2.QtCore import QSize
+from PySide2.QtGui import QIcon
 
 def logger(message:str,length="auto") -> None:
     """Simple console logger
@@ -162,19 +161,21 @@ class HouViewport:
             else:
                 logger("Multiple viewers detected!\nYou can select a viewer by executing the tool from the desired")
 
-        self.float_fullscreen=True
-        if self.viewport_panetab.isFloating():
-            self.float_panetab = self.viewport_panetab.floatingPanel()
-            self.float_fullscreen = self.float_panetab.isFullscreen()
-            self.float_panetab.setIsFullscreen(True)
-                
         self.viewport_pane = self.viewport_panetab.pane()
         self.settings = self.viewport_panetab.curViewport().settings()
 
     def startFlipbook(self,options):
-        self.viewport_panetab.flipbook(self.viewport_panetab.curViewport(), options)
+        float_fullscreen=False
+        float_panetab = ""
         if self.viewport_panetab.isFloating():
-            self.float_panetab.setIsFullscreen(self.float_fullscreen)
+            float_panetab = self.viewport_panetab.floatingPanel()
+            float_fullscreen = float_panetab.isFullscreen()
+            float_panetab.setIsFullscreen(True)
+
+        self.viewport_panetab.flipbook(self.viewport_panetab.curViewport(), options)
+
+        if self.viewport_panetab.isFloating():
+            float_panetab.setIsFullscreen(float_fullscreen)
 
     def getPaneTab(self):
         return self.viewport_panetab
@@ -219,9 +220,39 @@ class HouViewport:
             aspect = 1
         return aspect
 
+    def cameraName(self):
+        viewport = self.viewport_panetab.curViewport()
+        camera = viewport.camera()
+        if camera:
+            return camera.name()
+        else:
+            return "Viewport Default Camera"
+    
     def flipbook_settings(self):
         return self.viewport_panetab.flipbookSettings().stash()
-    
+
+class FileParser:
+    def __init__(self) -> None:
+        settings_file = (Path(__file__).parents[1] / "settings.json").as_posix()
+        data = {}
+        with open(settings_file) as f:
+            data = json.load(f)
+        self.paths = data.get("paths")
+
+    def getVersion(self,flipbook_name:str) -> str:
+        fb_folder = Path(hou.text.expandString(self.paths.get("fb_folder")).format(name=flipbook_name)).resolve()
+        if fb_folder.exists():
+            write_folder_vers = [x.name for x in fb_folder.iterdir() if x.is_dir()]
+            write_folder_vers = write_folder_vers if len(write_folder_vers) > 0 else ['v000']
+            last_ver_str = sorted(write_folder_vers)[-1][1:]
+            ver_digit = int(last_ver_str)+1
+            ver_padding = len(last_ver_str)
+            ver_str = f"v{str(ver_digit).zfill(ver_padding)}"
+        else:
+            ver_str = "v001"
+        return ver_str
+        
+
 class Icons:
     def __init__(self) -> None:
         self.iconfolder = Path(__file__).parents[1] / "icons"

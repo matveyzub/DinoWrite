@@ -82,6 +82,10 @@
             "background-color: #b78620;",
             "color: #000;"
         ],
+        "QComboBox:hover":[
+            "background-color: rgba(183, 134, 32, 20%);",
+            "border: 1px solid #5a4210;"
+        ],
         "QComboBox QAbstractItemView":[
             "background-color: #383838;",
             "color: #ffffff;",
@@ -95,6 +99,9 @@
             "background-color: transparent;",
             "color: lightgray;",
             "border: none;"
+        ],
+        "QCheckBox:hover":[
+            "background-color: rgba(183, 134, 32, 20%);"
         ],
         "QCheckBox::indicator":[
             "background-color: #323232;",
