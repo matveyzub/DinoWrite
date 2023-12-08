@@ -5,12 +5,15 @@ Python Tool for Houdini to easily write flipbooks
 
 # CONSTANTs
 TITLE = "DinoWrite"
-VERSION = "1.2.0"
-BRANCH = "dev"
+VERSION = "1.2.4"
+BRANCH = "main"
 WINDOW_TITLE = f"{TITLE} - {VERSION} - {BRANCH}"
 
-WINDOW_WIDTH = 400
-WINDOW_HIGHT = 380
+if BRANCH=="main":
+    WINDOW_TITLE = TITLE
+
+WINDOW_WIDTH = 430
+WINDOW_HIGHT = 470
 WIDTH_OFFSET = 20
 HIGHT_OFFSET = 90
 
@@ -45,6 +48,17 @@ FRAME_RANGES_DROPDOWN_DICT =  { "Global Frame Range":"$FSTART $FEND",
 FRAME_RANGES_COMPLETER_LIST = ['$F','$FSTART','$FEND','$RFSTART','$RFEND']
 RESOLUTION_DROPDOWN_LIST =    ["Camera Resolution", "50%", "---"]
 
+COLORS_PALLETE = {
+    "white":"#dedede",
+    "grey":"#2d2d2d",
+    "red":"#ec3c48",
+    "crimson":"#ff6570",
+    "orange":"#fa7960",
+    "yellow":"#f1d018",
+    "green":"#04e762",
+    "blue":"#00b6f8"
+}
+
 BYTES_TOLERANCE = 1024
 
 # IMPORTs
@@ -65,8 +79,8 @@ reload(flipbook)
 reload(qt_windows)
 reload(utils)
 
-# if BRANCH=="main":
-#     WINDOW_TITLE = f"{TITLE} - {{version}}"
+Icons = utils.Icons()
+Fileparser = utils.FileParser()
 
 # Functions
 def qtCompleter(array:list) -> QtWidgets.QCompleter: 
@@ -75,22 +89,92 @@ def qtCompleter(array:list) -> QtWidgets.QCompleter:
     completer.setCompletionMode(QtWidgets.QCompleter.InlineCompletion)
     return completer
 
-# Main Class
-class flipbook_menu(QtWidgets.QWidget):
+class TitleBar(QtWidgets.QWidget):
+    """
+    Custom titlebar with LOGO & TITLE & CLOSE BUTTON
+    """
+
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.initUI()
+
+    def initUI(self):
+        ### ICON
+        window_icon = qt_windows.HIcon(Icons.getRandom(type="Path"),size=40) 
+
+        ### TITLE
+        TITLE_SIZE=14
+        title = qt_windows.Label(WINDOW_TITLE,size=TITLE_SIZE)
+        title.setMaximumWidth(WINDOW_WIDTH/1.5)
+        title.setAlignment(QtCore.Qt.AlignCenter)
+        title.setStyleSheet(f"background-color:{COLORS_PALLETE['grey']};\
+                            border-radius: 10px;\
+                            color:{COLORS_PALLETE['white']};")
+
+        ### CLOSE BUTTON
+        CLOSE_BUTTON_SIZE = 20
+        close_button = qt_windows.PushButton()
+        close_button.setFixedSize(CLOSE_BUTTON_SIZE,CLOSE_BUTTON_SIZE)
+        close_button.setIcon(Icons.get("xmark.svg"))
+        close_button.setLayoutDirection(QtCore.Qt.RightToLeft)
+        close_button.setStyleSheet(f"QPushButton {{background-color:{COLORS_PALLETE['crimson']};\
+                                                    border-radius: 10px;}}\
+                                    QPushButton::hover {{background-color:{COLORS_PALLETE['red']};}}")
+        close_button.clicked.connect(self.close_window)
+        
+        layout = QtWidgets.QHBoxLayout()
+        layout.setContentsMargins(15,10,15,3)
+        layout.addWidget(window_icon)
+        layout.addWidget(title)
+        layout.addWidget(close_button)
+        self.setLayout(layout)
+
+        self.start = QtCore.QPoint(0, 0)
+        self.pressing = False
+
+    def mousePressEvent(self, event):
+        self.start = self.mapToGlobal(event.pos())
+        self.pressing = True
+
+    def mouseMoveEvent(self, event):
+        if self.pressing:
+            self.end = self.mapToGlobal(event.pos())
+            self.movement = self.end-self.start
+            self.parent.setGeometry(self.mapToGlobal(self.movement).x(),
+                                self.mapToGlobal(self.movement).y(),
+                                self.parent.width(),
+                                self.parent.height())
+            self.start = self.end
+
+    def mouseReleaseEvent(self, QMouseEvent):
+        self.pressing = False
+
+    def close_window(self):
+        self.parent.close()
+
+class DinoWriter(QtWidgets.QWidget):
 
     def __init__(self,kwargs):
         super().__init__(hou.qt.mainWindow())
+        
+        QtCore.QDir.addSearchPath("icons",Path(__file__,"../icons").resolve().as_posix())
 
-        self.Icons = utils.Icons()
         self.hou_viewport = utils.HouViewport(kwargs)
         self.kwargs = kwargs
 
         self.setWindowTitle(WINDOW_TITLE)
-        self.setWindowFlags(QtCore.Qt.Window)
+        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.setFixedWidth(WINDOW_WIDTH)
         self.setFixedHeight(WINDOW_HIGHT)
-        self.setWindowIcon(self.Icons.getRandom())
+
+        # Round edges on widget
+        radius = 15
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(QtCore.QRectF(self.rect()), radius, radius)
+        mask = QtGui.QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(mask)
 
         # Set proper window pos
         mouse_pos = QtGui.QCursor.pos()
@@ -107,26 +191,48 @@ class flipbook_menu(QtWidgets.QWidget):
         self.addframerange = settingsfile["custom_framerange"]
 
         self.data = self.load_json(Path(self.get_tmp(), self.paths.get("tmp_data")))
-
-        self.fileparser = utils.FileParser()
-
         self.initUI()
 
     def initUI(self):
-        # WIDGETS
 
         ### INFO LINE
+        info_frame = qt_windows.Frame(background_color=COLORS_PALLETE["grey"])
+        info_layout = QtWidgets.QVBoxLayout(info_frame)
+        info_layout.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        info_layout.setContentsMargins(10,5,10,5)
+
         self.cameraname = qt_windows.Label("Camera: {camera}".format(camera=self.hou_viewport.cameraName()))
-        self.ramusage = qt_windows.Label("")
+        self.ramusage =   qt_windows.Label("RAM Usage: {ramusage}")
+        self.seqname = qt_windows.ColorfulLabel()
+        self.cameraname.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.ramusage.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.seqname.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        
+        dino_paint = qt_windows.HIcon(Icons.get("label_dino_paint.svg",type="Path"),size=50)
+
+        sequence_layout = QtWidgets.QHBoxLayout()
+        sequence_layout.addWidget(self.seqname)
+        sequence_layout.addWidget(dino_paint)
+
+        info_layout.addWidget(self.cameraname)
+        info_layout.addWidget(self.ramusage)
+        info_layout.addLayout(sequence_layout)
+
+        ## MAIN SETTINGS
+        main_frame = qt_windows.Frame(background_color=COLORS_PALLETE["grey"])
+        grid_layout = QtWidgets.QGridLayout(main_frame)
 
         ### FIRST LINE
         label_filename =   qt_windows.HBLabel("Name")
         self.filename =    qt_windows.LineEdit(self.read_data("name", FILENAME_DEFAULT),hint=FILENAME_HINT)
-        self.filename.setCompleter(qtCompleter(self.flipbooks_menu()))
+        folders_list = self.flipbooks_menu()
+        self.filename.setCompleter(qtCompleter(folders_list))
         self.filename.installEventFilter(self)
+        self.menu_button = qt_windows.DropDownButton(menu=folders_list, callback=self.setMenuItemFile)
 
-        self.menu_button = qt_windows.DropDownButton(
-            menu=self.flipbooks_menu(), callback=self.setMenuItemFile)
+        grid_layout.addWidget(label_filename, 0, 0)
+        grid_layout.addWidget(self.filename, 0, 1, 1, 2)
+        grid_layout.addWidget(self.menu_button, 0, 3)
 
         ### SECOND LINE
         label_res = qt_windows.HBLabel("Resolution")
@@ -143,6 +249,11 @@ class flipbook_menu(QtWidgets.QWidget):
         self.res_menu = qt_windows.DropDownButton(
             menu=RESOLUTION_DROPDOWN_LIST + self.addresolution, callback=self.setMenuItemResolution)
 
+        grid_layout.addWidget(label_res, 1, 0)
+        grid_layout.addWidget(self.resx, 1, 1)
+        grid_layout.addWidget(self.resy, 1, 2)
+        grid_layout.addWidget(self.res_menu, 1, 3)
+
         ### THIRD LINE
         label_range =     qt_windows.HBLabel("Frame Range")
         self.framestart = qt_windows.LineEdit(self.read_data("framestart", FRAME_START_DEFAULT),hint=FRAME_START_HINT)
@@ -157,67 +268,73 @@ class flipbook_menu(QtWidgets.QWidget):
         self.native_ranges.update(self.addframerange)
         self.frame_menu = qt_windows.DropDownButton(menu=self.native_ranges.keys(), callback=self.setMenuItemFrameRange)
 
-        self.updateRamUsage()
+        grid_layout.addWidget(label_range, 2, 0)
+        grid_layout.addWidget(self.framestart, 2, 1)
+        grid_layout.addWidget(self.frameend, 2, 2)
+        grid_layout.addWidget(self.frame_menu, 2, 3)
 
         ### FOURTH LINE
         label_fileformat = qt_windows.HBLabel("File Format")
         self.fileformat =  qt_windows.ComboBox(self.formats["pic_exts"],item=self.read_data("fileformat", FILE_FORMAT_DEFAULT))
 
-        ### CHECKBOXES
+        grid_layout.addWidget(label_fileformat, 3, 0)
+        grid_layout.addWidget(self.fileformat, 3, 1,1,3)
+
+        ## CHECKBOXES
+        checkbox_frame = qt_windows.Frame(background_color=COLORS_PALLETE["grey"])
+        checkbox_layout = QtWidgets.QVBoxLayout(checkbox_frame)
+
         self.convertvideo =       qt_windows.CheckBox(
             "Convert to video",self.read_data("convertvideo", CONVERT_VIDEO_DEFAULT))
+        convertvideo_icon = qt_windows.HIcon(Icons.get("clapperboard.svg",type="Path"),size=15)
         self.blackbackground =    qt_windows.CheckBox(
             "Switch to black background", self.read_data("blackbg", BLACK_BACKGROUND_DEFAULT))
+        blackbackground_icon = qt_windows.HIcon(Icons.get("circle-half-stroke.svg",type="Path"),size=15)
         self.offbackgroundimage = qt_windows.CheckBox(
             "Off Background Image",self.read_data("bgimage", OFF_BACKGROUND_IMAGE_DEFAULT))
+        offbackgroundimage_icon = qt_windows.HIcon(Icons.get("eye-slash.svg",type="Path"),size=15)
         self.openwritefolder =    qt_windows.CheckBox(
             "Open write folder",self.read_data("openfolder", OPEN_WRITE_FOLDER_DEFAULT))
+        openwritefolder_icon = qt_windows.HIcon(Icons.get("folder-open.svg",type="Path"),size=15)
+        
+        self.convertvideo.setToolTip("After the end of recording the flipbook,the entire \nsequence of files will be converted to video via ffmpeg")
+        self.blackbackground.setToolTip("When recording a flipbook with white/gray background colors , the final \nimage turns out to be incorrect. \n\nThis checkbox switches the background to black during the recording of the flipbook")
+        self.offbackgroundimage.setToolTip("When you use a shot sequence on the background, sometimes \nyou have to turn it off to record pure 3d and put \nthe background on the composition\n\nThis checkbox disable the background for the time of recording the flipbook and then \nreturn it to its original state")
+        self.openwritefolder.setToolTip("After finishing recording, the flipbook opens the folder where it was recorded.")
+
+        convertvideo_layout =       qt_windows.HWidget([self.convertvideo,convertvideo_icon])
+        blackbackground_layout =    qt_windows.HWidget([self.blackbackground,blackbackground_icon])
+        offbackgroundimage_layout = qt_windows.HWidget([self.offbackgroundimage,offbackgroundimage_icon])
+        openwritefolder_layout =    qt_windows.HWidget([self.openwritefolder,openwritefolder_icon])
+
+        checkbox_layout.addLayout(convertvideo_layout)
+        checkbox_layout.addLayout(blackbackground_layout)
+        checkbox_layout.addLayout(offbackgroundimage_layout)
+        checkbox_layout.addLayout(openwritefolder_layout)
         
         ### MAIN BUTTON
-        self.writebutton = qt_windows.PushButton("WRITE", default=True,size=qt_windows.MAIN_SIZE+4)
-
-        ### COLOR FILENAME
-        self.label_name = qt_windows.ColorfulLabel(self.filename.text(),
-                                                self.fileparser.getVersion(self.filename.text()),
-                                                "$F4",
-                                                self.fileformat.currentText())
+        self.writebutton = qt_windows.PushButton("WRITE ", default=True,size=qt_windows.MAIN_SIZE+4)
+        self.writebutton.setIcon(Icons.get("dino_cam.svg"))
+        self.writebutton.setIconSize(QtCore.QSize(35,35))
+        self.writebutton.setLayoutDirection(QtCore.Qt.RightToLeft)
 
         # LAYOUTS
-        grid =  QtWidgets.QGridLayout()
+        TITLE_LAYOUT = QtWidgets.QVBoxLayout() 
+        TITLE_LAYOUT.setContentsMargins(0,0,0,0)
+
         MAIN_LAYOUT = QtWidgets.QVBoxLayout()
+        MAIN_LAYOUT.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        MAIN_LAYOUT.setContentsMargins(10,10,10,10)
 
-        grid.addWidget(label_filename, 0, 0)
-        grid.addWidget(self.filename, 0, 1, 1, 2)
-        grid.addWidget(self.menu_button, 0, 3)
-
-        grid.addWidget(label_res, 1, 0)
-        grid.addWidget(self.resx, 1, 1)
-        grid.addWidget(self.resy, 1, 2)
-        grid.addWidget(self.res_menu, 1, 3)
-
-        grid.addWidget(label_range, 2, 0)
-        grid.addWidget(self.framestart, 2, 1)
-        grid.addWidget(self.frameend, 2, 2)
-        grid.addWidget(self.frame_menu, 2, 3)
-
-        grid.addWidget(label_fileformat, 3, 0)
-        grid.addWidget(self.fileformat, 3, 1, 1, 3)
-
-        MAIN_LAYOUT.addWidget(self.cameraname)
-        MAIN_LAYOUT.addWidget(self.ramusage)
-        MAIN_LAYOUT.addSpacing(10)
-        MAIN_LAYOUT.addWidget(qt_windows.HSeparator())
-        MAIN_LAYOUT.addLayout(grid)
-        MAIN_LAYOUT.addWidget(qt_windows.HSeparator())
-        MAIN_LAYOUT.addWidget(self.convertvideo)
-        MAIN_LAYOUT.addWidget(self.blackbackground)
-        MAIN_LAYOUT.addWidget(self.offbackgroundimage)
-        MAIN_LAYOUT.addWidget(self.openwritefolder)
-        MAIN_LAYOUT.addWidget(qt_windows.HSeparator())
+        MAIN_LAYOUT.addWidget(info_frame)
+        MAIN_LAYOUT.addWidget(main_frame)
+        MAIN_LAYOUT.addWidget(checkbox_frame)
         MAIN_LAYOUT.addWidget(self.writebutton)
-        MAIN_LAYOUT.addWidget(self.label_name)
 
-        self.setLayout(MAIN_LAYOUT)
+        TITLE_LAYOUT.addWidget(TitleBar(self))
+        TITLE_LAYOUT.addLayout(MAIN_LAYOUT)
+
+        self.setLayout(TITLE_LAYOUT)
 
         # SIGNALS
         self.filename.editingFinished.connect(self.updateColorfulLabel)
@@ -230,9 +347,13 @@ class flipbook_menu(QtWidgets.QWidget):
         self.framestart.editingFinished.connect(self.updateRamUsage)
         self.frameend.editingFinished.connect(self.updateRamUsage)
         self.frame_menu.menu.triggered.connect(self.updateRamUsage)
+        self.convertvideo.stateChanged.connect(self.updateFileFormat)
         self.writebutton.clicked.connect(self.main)
 
         # SCRIPTS
+        self.updateRamUsage()
+        self.updateColorfulLabel()
+
         flipbook_widget = None
         for w in hou.qt.mainWindow().children():
             if w.isWidgetType():
@@ -257,20 +378,25 @@ class flipbook_menu(QtWidgets.QWidget):
                 self.writebutton.animateClick()
             self.writebutton.setDefault(True)
 
-        # if source==self.convertvideo and event.type()==QtCore.QEvent.MouseButtonRelease:
-        #     if self.convertvideo.isChecked():
-        #         self.fileformat.clear()
-        #         self.fileformat.addItems(self.formats["pic_exts"])
-        #     else:
-        #         self.fileformat.clear()
-        #         self.fileformat.addItems(self.formats["video_exts"])
-
         return super().eventFilter(source, event)
 
+    def updateFileFormat(self):
+        state = self.convertvideo.isChecked()
+        if state:
+            self.fileformat.setCurrentText("exr")
+            self.fileformat.setDisabled(True)
+        else:
+            self.fileformat.setDisabled(False)
+
     def updateColorfulLabel(self):
-        self.label_name.update(name=self.filename.text(),
-                                version=self.fileparser.getVersion(self.filename.text()),
-                                extension=self.fileformat.currentText())
+        self.seqname.update(["Sequence name: ",COLORS_PALLETE["white"],
+                            self.filename.text(),COLORS_PALLETE["orange"],
+                            ".",COLORS_PALLETE["white"],
+                            Fileparser.getVersion(self.filename.text()),COLORS_PALLETE["yellow"],
+                            ".",COLORS_PALLETE["white"],
+                            "$F4",COLORS_PALLETE["green"],
+                            ".",COLORS_PALLETE["white"],
+                            self.fileformat.currentText(),COLORS_PALLETE["blue"]])
 
     def updateCameraLabel(self):
         self.cameraname.setText(f"Camera: {self.hou_viewport.cameraName()}")
@@ -329,6 +455,7 @@ class flipbook_menu(QtWidgets.QWidget):
                 pfolder.mkdir(parents=True, exist_ok=True)
             else:
                 utils.logger("No folder to write in flipbooks\nChange path or create folder")
+                self.close()
                 return []
 
         folders = [x.name for x in pfolder.iterdir() if x.is_dir()]

@@ -241,7 +241,7 @@ class FileParser:
 
     def getVersion(self,flipbook_name:str) -> str:
         fb_folder = Path(hou.text.expandString(self.paths.get("fb_folder")).format(name=flipbook_name)).resolve()
-        if fb_folder.exists():
+        if fb_folder.exists() and len(flipbook_name)!=0:
             write_folder_vers = [x.name for x in fb_folder.iterdir() if x.is_dir()]
             write_folder_vers = write_folder_vers if len(write_folder_vers) > 0 else ['v000']
             last_ver_str = sorted(write_folder_vers)[-1][1:]
@@ -257,14 +257,17 @@ class Icons:
     def __init__(self) -> None:
         self.iconfolder = Path(__file__).parents[1] / "icons"
 
-    def get(self,name:str):
+    def get(self,name:str,type:str="Icon") -> QIcon:
         iconpath = Path(self.iconfolder) / name
-        if iconpath.exists():
-            return QIcon(iconpath.as_posix())
-        else:
+        if not iconpath.exists():
             logger(f"No icon found:\n{iconpath.as_posix()}")
+        else:
+            if type=="Icon":
+                return QIcon(iconpath.as_posix())
+            elif type=="Path":
+                return iconpath.as_posix()
 
-    def getRandom(self,prefix="app"):
+    def getRandom(self,prefix="app",type="Icon"):
         iconpath = Path(self.iconfolder)
         icons = [x for x in iconpath.iterdir() if x.stem.startswith(prefix)]
         
@@ -273,4 +276,7 @@ class Icons:
             return QIcon()
         else:
             icon = (random.choice(icons)).as_posix()
-            return QIcon(icon)
+            if type=="Icon":
+                return QIcon(icon)
+            elif type=="Path":
+                return icon
