@@ -46,10 +46,11 @@ FRAME_RANGES_DROPDOWN_DICT =  { "Global Frame Range":"$FSTART $FEND",
                                 "Playbar Frame Range":"$RFSTART $RFEND",
                                 "---":""}
 FRAME_RANGES_COMPLETER_LIST = ['$F','$FSTART','$FEND','$RFSTART','$RFEND']
-RESOLUTION_DROPDOWN_LIST =    ["Camera Resolution", "50%", "---"]
+RESOLUTION_DROPDOWN_LIST =    ["Camera Resolution","1/2","2/3","---"]
 
 COLORS_PALLETE = {
     "white":"#dedede",
+    "grey-bright":"#373737",
     "grey":"#2d2d2d",
     "red":"#ec3c48",
     "crimson":"#ff6570",
@@ -62,34 +63,28 @@ COLORS_PALLETE = {
 BYTES_TOLERANCE = 1024
 
 # IMPORTs
-from PySide2 import QtCore
-from PySide2 import QtGui
-from PySide2 import QtWidgets
+from PySide2.QtWidgets import *
+from PySide2.QtGui import *
+from PySide2.QtCore import *
 
 from importlib import reload
 from pathlib import Path
+from re import search as regsearch
 
-from .utils import qt_windows , utils
+from .utils import widgets , utils
 from . import flipbook
 
 import hou
 import json
 
 reload(flipbook)
-reload(qt_windows)
+reload(widgets)
 reload(utils)
 
 Icons = utils.Icons()
 Fileparser = utils.FileParser()
 
-# Functions
-def qtCompleter(array:list) -> QtWidgets.QCompleter: 
-    completer = QtWidgets.QCompleter(array)
-    completer.setCaseSensitivity(QtGui.Qt.CaseInsensitive)
-    completer.setCompletionMode(QtWidgets.QCompleter.InlineCompletion)
-    return completer
-
-class TitleBar(QtWidgets.QWidget):
+class TitleBar(QWidget):
     """
     Custom titlebar with LOGO & TITLE & CLOSE BUTTON
     """
@@ -101,41 +96,40 @@ class TitleBar(QtWidgets.QWidget):
 
     def initUI(self):
         ### ICON
-        window_icon = qt_windows.HIcon(Icons.getRandom(type="Path"),size=40) 
+        window_icon = widgets.HIcon(Icons.getRandom(type="Path"),size=40) 
 
         ### TITLE
         TITLE_SIZE=14
-        title = qt_windows.Label(WINDOW_TITLE,size=TITLE_SIZE)
-        title.setMaximumWidth(WINDOW_WIDTH/1.5)
-        title.setAlignment(QtCore.Qt.AlignCenter)
-        title.setStyleSheet(f"background-color:{COLORS_PALLETE['grey']};\
+        self.title = widgets.Label(WINDOW_TITLE,size=TITLE_SIZE)
+        self.title.setMaximumWidth(WINDOW_WIDTH/1.5)
+        self.title.setAlignment(Qt.AlignCenter)
+        self.title.setStyleSheet(f"background-color:{COLORS_PALLETE['grey']};\
                             border-radius: 10px;\
                             color:{COLORS_PALLETE['white']};")
+        self.title.setCursor(Qt.OpenHandCursor)
 
         ### CLOSE BUTTON
         CLOSE_BUTTON_SIZE = 20
-        close_button = qt_windows.PushButton()
+        close_button = widgets.PushButton()
         close_button.setFixedSize(CLOSE_BUTTON_SIZE,CLOSE_BUTTON_SIZE)
-        close_button.setIcon(Icons.get("xmark.svg"))
-        close_button.setLayoutDirection(QtCore.Qt.RightToLeft)
+        close_button.setIcon(Icons.get("close.svg"))
+        close_button.setLayoutDirection(Qt.RightToLeft)
         close_button.setStyleSheet(f"QPushButton {{background-color:{COLORS_PALLETE['crimson']};\
                                                     border-radius: 10px;}}\
                                     QPushButton::hover {{background-color:{COLORS_PALLETE['red']};}}")
         close_button.clicked.connect(self.close_window)
         
-        layout = QtWidgets.QHBoxLayout()
+        layout = widgets.HLayout([window_icon,self.title,close_button],align=None)
         layout.setContentsMargins(15,10,15,3)
-        layout.addWidget(window_icon)
-        layout.addWidget(title)
-        layout.addWidget(close_button)
         self.setLayout(layout)
 
-        self.start = QtCore.QPoint(0, 0)
+        self.start = QPoint(0, 0)
         self.pressing = False
 
     def mousePressEvent(self, event):
         self.start = self.mapToGlobal(event.pos())
         self.pressing = True
+        self.title.setCursor(Qt.ClosedHandCursor)
 
     def mouseMoveEvent(self, event):
         if self.pressing:
@@ -149,40 +143,70 @@ class TitleBar(QtWidgets.QWidget):
 
     def mouseReleaseEvent(self, QMouseEvent):
         self.pressing = False
+        self.title.setCursor(Qt.OpenHandCursor)
 
     def close_window(self):
         self.parent.close()
 
-class DinoWriter(QtWidgets.QWidget):
+class DinoWriter(QWidget):
 
     def __init__(self,kwargs):
+        '''
+        Parent widget to houdini window to make it visible
+        '''
         super().__init__(hou.qt.mainWindow())
-        
-        QtCore.QDir.addSearchPath("icons",Path(__file__,"../icons").resolve().as_posix())
 
-        self.hou_viewport = utils.HouViewport(kwargs)
-        self.kwargs = kwargs
 
+        '''
+        Adding search path to Qt to be able to using "icons:filepath" prefix in stylesheets files
+        '''
+        QDir.addSearchPath("icons",Path(__file__,"../icons").resolve().as_posix())
+
+
+        '''
+        Setting some flags to widget
+        WindowTitle - allows you to track the widget among others and not paint a new widget, in case of a repeat call
+        QtWindow and Frameless flags - just for TitleBar
+        WA_DeleteOnClose attribute - allows to delete widget in application childrens after widget is closed
+        FixedSize - Blocks the user from being able to stretch the widget in different directions
+        '''
         self.setWindowTitle(WINDOW_TITLE)
-        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setFixedWidth(WINDOW_WIDTH)
-        self.setFixedHeight(WINDOW_HIGHT)
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.setFixedSize(WINDOW_WIDTH,WINDOW_HIGHT)
+        self.setStyleSheet(f"background-color:{COLORS_PALLETE['grey-bright']};")
 
-        # Round edges on widget
+
+        '''
+        Setting round edges on widget
+        It seems to me that this option is bad, since the 
+        mask is bitwise , which causes ugly aliasing at the edges
+        '''
         radius = 15
-        path = QtGui.QPainterPath()
-        path.addRoundedRect(QtCore.QRectF(self.rect()), radius, radius)
-        mask = QtGui.QRegion(path.toFillPolygon().toPolygon())
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), radius, radius)
+        mask = QRegion(path.toFillPolygon().toPolygon())
         self.setMask(mask)
 
-        # Set proper window pos
-        mouse_pos = QtGui.QCursor.pos()
-        screen = QtWidgets.QDesktopWidget().screenNumber(mouse_pos)
-        screenGeometry = QtWidgets.QDesktopWidget().screenGeometry(screen)
+
+        '''
+        Settng proper widget position
+        I'm believe that in should work on any monitor setup's
+        The point is that the window does NOT spawn on the border of the monitors or beyond
+        '''
+        mouse_pos = QCursor.pos()
+        screen = QDesktopWidget().screenNumber(mouse_pos)
+        screenGeometry = QDesktopWidget().screenGeometry(screen)
         xpoint = min( max(mouse_pos.x()-WINDOW_WIDTH/2,screenGeometry.x() + WIDTH_OFFSET) , screenGeometry.x() + screenGeometry.width() - WINDOW_WIDTH - WIDTH_OFFSET )
         ypoint = min(mouse_pos.y()-WINDOW_HIGHT/2+HIGHT_OFFSET,screenGeometry.height()-WINDOW_HIGHT-100)
-        self.move(QtCore.QPoint(xpoint,ypoint))
+        self.move(QPoint(xpoint,ypoint))
+
+
+        '''
+        Promoting viewport settings and kwargs
+        '''
+        self.hou_viewport = utils.HouViewport(kwargs)
+        self.kwargs = kwargs
 
         settingsfile = self.load_json(Path(__file__).parent / "settings.json")
         self.paths = settingsfile["paths"]
@@ -196,57 +220,58 @@ class DinoWriter(QtWidgets.QWidget):
     def initUI(self):
 
         ### INFO LINE
-        info_frame = qt_windows.Frame(background_color=COLORS_PALLETE["grey"])
-        info_layout = QtWidgets.QVBoxLayout(info_frame)
-        info_layout.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        info_frame = widgets.Frame(background_color=COLORS_PALLETE["grey"])
+        info_layout = QVBoxLayout(info_frame)
+        info_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         info_layout.setContentsMargins(10,5,10,5)
 
-        self.cameraname = qt_windows.Label("Camera: {camera}".format(camera=self.hou_viewport.cameraName()))
-        self.ramusage =   qt_windows.Label("RAM Usage: {ramusage}")
-        self.seqname = qt_windows.ColorfulLabel()
-        self.cameraname.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        self.ramusage.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        self.seqname.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.cameraname = widgets.Label("Camera: {camera}".format(camera=self.hou_viewport.cameraName()))
+        self.ramusage =   widgets.Label("RAM Usage: {ramusage}")
+        self.seqname = widgets.ColorfulLabel()
+        dino_paint = widgets.HIcon(Icons.get("label_dino_paint.svg",type="Path"),size=50)
         
-        dino_paint = qt_windows.HIcon(Icons.get("label_dino_paint.svg",type="Path"),size=50)
-
-        sequence_layout = QtWidgets.QHBoxLayout()
-        sequence_layout.addWidget(self.seqname)
-        sequence_layout.addWidget(dino_paint)
+        self.cameraname.setCursor(Qt.IBeamCursor)
+        self.cameraname.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.ramusage.setCursor(Qt.IBeamCursor)
+        self.ramusage.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.seqname.setCursor(Qt.IBeamCursor)
+        self.seqname.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        
+        sequence_layout = widgets.HLayout([self.seqname,dino_paint],align=None)
 
         info_layout.addWidget(self.cameraname)
         info_layout.addWidget(self.ramusage)
         info_layout.addLayout(sequence_layout)
 
         ## MAIN SETTINGS
-        main_frame = qt_windows.Frame(background_color=COLORS_PALLETE["grey"])
-        grid_layout = QtWidgets.QGridLayout(main_frame)
+        main_frame = widgets.Frame(background_color=COLORS_PALLETE["grey"])
+        grid_layout = QGridLayout(main_frame)
 
         ### FIRST LINE
-        label_filename =   qt_windows.HBLabel("Name")
-        self.filename =    qt_windows.LineEdit(self.read_data("name", FILENAME_DEFAULT),hint=FILENAME_HINT)
+        label_filename =   widgets.HBLabel("Name")
+        self.filename =    widgets.LineEdit(self.read_data("name", FILENAME_DEFAULT),hint=FILENAME_HINT)
         folders_list = self.flipbooks_menu()
-        self.filename.setCompleter(qtCompleter(folders_list))
+        self.filename.setCompleter(widgets.Completer(folders_list))
         self.filename.installEventFilter(self)
-        self.menu_button = qt_windows.DropDownButton(menu=folders_list, callback=self.setMenuItemFile)
+        self.menu_button = widgets.DropDownButton(menu=folders_list, callback=self.setMenuItemFile)
 
         grid_layout.addWidget(label_filename, 0, 0)
         grid_layout.addWidget(self.filename, 0, 1, 1, 2)
         grid_layout.addWidget(self.menu_button, 0, 3)
 
         ### SECOND LINE
-        label_res = qt_windows.HBLabel("Resolution")
-        self.resx = qt_windows.LineEdit(self.read_data("resx", RESOLUTION_X_DEFAULT),hint=RESOLUTION_X_HINT)
-        self.resx.setValidator(QtGui.QIntValidator())
-        self.resx.setCompleter(qtCompleter([x.split(" ")[0] for x in self.addresolution]))
+        label_res = widgets.HBLabel("Resolution")
+        self.resx = widgets.LineEdit(self.read_data("resx", RESOLUTION_X_DEFAULT),hint=RESOLUTION_X_HINT)
+        self.resx.setValidator(QIntValidator())
+        self.resx.setCompleter(widgets.Completer([x.split(" ")[0] for x in self.addresolution]))
         self.resx.installEventFilter(self)
 
-        self.resy = qt_windows.LineEdit(self.read_data("resy", RESOLUTION_Y_DEFAULT),hint=RESOLUTION_Y_HINT)
-        self.resy.setValidator(QtGui.QIntValidator())
-        self.resy.setCompleter(qtCompleter([x.split(" ")[1] for x in self.addresolution]))
+        self.resy = widgets.LineEdit(self.read_data("resy", RESOLUTION_Y_DEFAULT),hint=RESOLUTION_Y_HINT)
+        self.resy.setValidator(QIntValidator())
+        self.resy.setCompleter(widgets.Completer([x.split(" ")[1] for x in self.addresolution]))
         self.resy.installEventFilter(self)
 
-        self.res_menu = qt_windows.DropDownButton(
+        self.res_menu = widgets.DropDownButton(
             menu=RESOLUTION_DROPDOWN_LIST + self.addresolution, callback=self.setMenuItemResolution)
 
         grid_layout.addWidget(label_res, 1, 0)
@@ -255,18 +280,18 @@ class DinoWriter(QtWidgets.QWidget):
         grid_layout.addWidget(self.res_menu, 1, 3)
 
         ### THIRD LINE
-        label_range =     qt_windows.HBLabel("Frame Range")
-        self.framestart = qt_windows.LineEdit(self.read_data("framestart", FRAME_START_DEFAULT),hint=FRAME_START_HINT)
-        self.framestart.setCompleter(qtCompleter(FRAME_RANGES_COMPLETER_LIST))
+        label_range =     widgets.HBLabel("Frame Range")
+        self.framestart = widgets.LineEdit(self.read_data("framestart", FRAME_START_DEFAULT),hint=FRAME_START_HINT)
+        self.framestart.setCompleter(widgets.Completer(FRAME_RANGES_COMPLETER_LIST))
         self.framestart.installEventFilter(self)
 
-        self.frameend =   qt_windows.LineEdit(self.read_data("frameend", FRAME_END_DEFAULT),hint=FRAME_END_HINT)
-        self.frameend.setCompleter(qtCompleter(FRAME_RANGES_COMPLETER_LIST))
+        self.frameend =   widgets.LineEdit(self.read_data("frameend", FRAME_END_DEFAULT),hint=FRAME_END_HINT)
+        self.frameend.setCompleter(widgets.Completer(FRAME_RANGES_COMPLETER_LIST))
         self.frameend.installEventFilter(self)
 
         self.native_ranges = FRAME_RANGES_DROPDOWN_DICT
         self.native_ranges.update(self.addframerange)
-        self.frame_menu = qt_windows.DropDownButton(menu=self.native_ranges.keys(), callback=self.setMenuItemFrameRange)
+        self.frame_menu = widgets.DropDownButton(menu=self.native_ranges.keys(), callback=self.setMenuItemFrameRange)
 
         grid_layout.addWidget(label_range, 2, 0)
         grid_layout.addWidget(self.framestart, 2, 1)
@@ -274,38 +299,38 @@ class DinoWriter(QtWidgets.QWidget):
         grid_layout.addWidget(self.frame_menu, 2, 3)
 
         ### FOURTH LINE
-        label_fileformat = qt_windows.HBLabel("File Format")
-        self.fileformat =  qt_windows.ComboBox(self.formats["pic_exts"],item=self.read_data("fileformat", FILE_FORMAT_DEFAULT))
+        label_fileformat = widgets.HBLabel("File Format")
+        self.fileformat =  widgets.ComboBox(self.formats["pic_exts"],item=self.read_data("fileformat", FILE_FORMAT_DEFAULT))
 
         grid_layout.addWidget(label_fileformat, 3, 0)
         grid_layout.addWidget(self.fileformat, 3, 1,1,3)
 
         ## CHECKBOXES
-        checkbox_frame = qt_windows.Frame(background_color=COLORS_PALLETE["grey"])
-        checkbox_layout = QtWidgets.QVBoxLayout(checkbox_frame)
+        checkbox_frame = widgets.Frame(background_color=COLORS_PALLETE["grey"])
+        checkbox_layout = QVBoxLayout(checkbox_frame)
 
-        self.convertvideo =       qt_windows.CheckBox(
+        self.convertvideo =       widgets.CheckBox(
             "Convert to video",self.read_data("convertvideo", CONVERT_VIDEO_DEFAULT))
-        convertvideo_icon = qt_windows.HIcon(Icons.get("clapperboard.svg",type="Path"),size=15)
-        self.blackbackground =    qt_windows.CheckBox(
+        convertvideo_icon = widgets.HIcon(Icons.get("clapperboard.svg",type="Path"),size=15)
+        self.blackbackground =    widgets.CheckBox(
             "Switch to black background", self.read_data("blackbg", BLACK_BACKGROUND_DEFAULT))
-        blackbackground_icon = qt_windows.HIcon(Icons.get("circle-half-stroke.svg",type="Path"),size=15)
-        self.offbackgroundimage = qt_windows.CheckBox(
+        blackbackground_icon = widgets.HIcon(Icons.get("circle-half-stroke.svg",type="Path"),size=15)
+        self.offbackgroundimage = widgets.CheckBox(
             "Off Background Image",self.read_data("bgimage", OFF_BACKGROUND_IMAGE_DEFAULT))
-        offbackgroundimage_icon = qt_windows.HIcon(Icons.get("eye-slash.svg",type="Path"),size=15)
-        self.openwritefolder =    qt_windows.CheckBox(
+        offbackgroundimage_icon = widgets.HIcon(Icons.get("eye-slash.svg",type="Path"),size=15)
+        self.openwritefolder =    widgets.CheckBox(
             "Open write folder",self.read_data("openfolder", OPEN_WRITE_FOLDER_DEFAULT))
-        openwritefolder_icon = qt_windows.HIcon(Icons.get("folder-open.svg",type="Path"),size=15)
+        openwritefolder_icon = widgets.HIcon(Icons.get("folder-open.svg",type="Path"),size=15)
         
         self.convertvideo.setToolTip("After the end of recording the flipbook,the entire \nsequence of files will be converted to video via ffmpeg")
         self.blackbackground.setToolTip("When recording a flipbook with white/gray background colors , the final \nimage turns out to be incorrect. \n\nThis checkbox switches the background to black during the recording of the flipbook")
         self.offbackgroundimage.setToolTip("When you use a shot sequence on the background, sometimes \nyou have to turn it off to record pure 3d and put \nthe background on the composition\n\nThis checkbox disable the background for the time of recording the flipbook and then \nreturn it to its original state")
         self.openwritefolder.setToolTip("After finishing recording, the flipbook opens the folder where it was recorded.")
 
-        convertvideo_layout =       qt_windows.HWidget([self.convertvideo,convertvideo_icon])
-        blackbackground_layout =    qt_windows.HWidget([self.blackbackground,blackbackground_icon])
-        offbackgroundimage_layout = qt_windows.HWidget([self.offbackgroundimage,offbackgroundimage_icon])
-        openwritefolder_layout =    qt_windows.HWidget([self.openwritefolder,openwritefolder_icon])
+        convertvideo_layout =       widgets.HLayout([self.convertvideo,convertvideo_icon])
+        blackbackground_layout =    widgets.HLayout([self.blackbackground,blackbackground_icon])
+        offbackgroundimage_layout = widgets.HLayout([self.offbackgroundimage,offbackgroundimage_icon])
+        openwritefolder_layout =    widgets.HLayout([self.openwritefolder,openwritefolder_icon])
 
         checkbox_layout.addLayout(convertvideo_layout)
         checkbox_layout.addLayout(blackbackground_layout)
@@ -313,17 +338,17 @@ class DinoWriter(QtWidgets.QWidget):
         checkbox_layout.addLayout(openwritefolder_layout)
         
         ### MAIN BUTTON
-        self.writebutton = qt_windows.PushButton("WRITE ", default=True,size=qt_windows.MAIN_SIZE+4)
+        self.writebutton = widgets.PushButton("WRITE ", default=True,size=widgets.MAIN_SIZE+4)
         self.writebutton.setIcon(Icons.get("dino_cam.svg"))
-        self.writebutton.setIconSize(QtCore.QSize(35,35))
-        self.writebutton.setLayoutDirection(QtCore.Qt.RightToLeft)
+        self.writebutton.setIconSize(QSize(35,35))
+        self.writebutton.setLayoutDirection(Qt.RightToLeft)
 
         # LAYOUTS
-        TITLE_LAYOUT = QtWidgets.QVBoxLayout() 
+        TITLE_LAYOUT = QVBoxLayout() 
         TITLE_LAYOUT.setContentsMargins(0,0,0,0)
 
-        MAIN_LAYOUT = QtWidgets.QVBoxLayout()
-        MAIN_LAYOUT.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        MAIN_LAYOUT = QVBoxLayout()
+        MAIN_LAYOUT.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         MAIN_LAYOUT.setContentsMargins(10,10,10,10)
 
         MAIN_LAYOUT.addWidget(info_frame)
@@ -341,7 +366,9 @@ class DinoWriter(QtWidgets.QWidget):
         self.menu_button.menu.triggered.connect(self.updateColorfulLabel)
         self.fileformat.currentIndexChanged.connect(self.updateColorfulLabel)
         self.resx.editingFinished.connect(self.updateRamUsage)
+        self.resx.editingFinished.connect(self.updateResolutions)
         self.resy.editingFinished.connect(self.updateRamUsage)
+        self.resy.editingFinished.connect(self.updateResolutions)
         self.res_menu.menu.triggered.connect(self.updateRamUsage)
         self.res_menu.menu.triggered.connect(self.updateCameraLabel)
         self.framestart.editingFinished.connect(self.updateRamUsage)
@@ -353,11 +380,17 @@ class DinoWriter(QtWidgets.QWidget):
         # SCRIPTS
         self.updateRamUsage()
         self.updateColorfulLabel()
+        self.updateFileFormat()
+        self.updateResolutions()
 
+
+        '''
+        Track if widget opened via search through childrens of Houdini Window
+        Search by window title which we set in line 169
+        '''
         flipbook_widget = None
         for w in hou.qt.mainWindow().children():
-            if w.isWidgetType():
-                if w.windowTitle()==WINDOW_TITLE and w.isVisible():
+            if w.isWidgetType() and w.windowTitle()==WINDOW_TITLE and w.isVisible():
                     flipbook_widget = w
 
         if flipbook_widget:
@@ -367,18 +400,26 @@ class DinoWriter(QtWidgets.QWidget):
             self.show()
 
     def eventFilter(self, source , event) -> bool:
-        if  event.type() == QtCore.QEvent.FocusIn or \
-            event.type() == QtCore.QEvent.KeyRelease and \
-            event.key() not in [QtCore.Qt.Key_Return,QtCore.Qt.Key_Enter]:
+        if  event.type() == QEvent.FocusIn or \
+            event.type() == QEvent.KeyRelease and \
+            event.key() not in [Qt.Key_Return,Qt.Key_Enter]:
             self.writebutton.setDefault(False)
 
-        elif event.type() == QtCore.QEvent.KeyRelease and \
-            event.key() in [QtCore.Qt.Key_Return,QtCore.Qt.Key_Enter]:
+        elif event.type() == QEvent.KeyRelease and \
+            event.key() in [Qt.Key_Return,Qt.Key_Enter]:
             if self.writebutton.isDefault():
                 self.writebutton.animateClick()
             self.writebutton.setDefault(True)
 
+        if event.type() == QEvent.FocusOut and \
+            source in [self.resx,self.resy]:
+            self.updateResolutions()
+
         return super().eventFilter(source, event)
+    
+    def updateResolutions(self):
+        self.resx.setText( str( max( int( self.resx.text() ),MIN_RESOLUTION_X) ) )
+        self.resy.setText( str( max( int( self.resy.text() ),MIN_RESOLUTION_Y) ) )
 
     def updateFileFormat(self):
         state = self.convertvideo.isChecked()
@@ -389,14 +430,34 @@ class DinoWriter(QtWidgets.QWidget):
             self.fileformat.setDisabled(False)
 
     def updateColorfulLabel(self):
-        self.seqname.update(["Sequence name: ",COLORS_PALLETE["white"],
-                            self.filename.text(),COLORS_PALLETE["orange"],
-                            ".",COLORS_PALLETE["white"],
-                            Fileparser.getVersion(self.filename.text()),COLORS_PALLETE["yellow"],
-                            ".",COLORS_PALLETE["white"],
-                            "$F4",COLORS_PALLETE["green"],
-                            ".",COLORS_PALLETE["white"],
-                            self.fileformat.currentText(),COLORS_PALLETE["blue"]])
+
+        label =     ["Sequence name: ",COLORS_PALLETE["white"]]
+        separator = [".",COLORS_PALLETE["white"]]
+        final_list = label
+
+        fb_name = self.paths.get("fb_name")
+        for name in fb_name.split("."):
+            part = name.format(name=self.filename.text(),
+                                version=Fileparser.getVersion(self.filename.text()),
+                                fileformat=self.fileformat.currentText())
+            
+            if name == "{name}":
+                final_list.append(part)
+                final_list.append(COLORS_PALLETE["orange"])
+            elif regsearch(r"\$F\d+",name):
+                final_list.append(part)
+                final_list.append(COLORS_PALLETE["green"])
+            elif name == "{version}":
+                final_list.append(part)
+                final_list.append(COLORS_PALLETE["yellow"])
+            elif name == "{fileformat}":
+                final_list.append(part)
+                final_list.append(COLORS_PALLETE["blue"])
+            else:
+                final_list.append(name)
+                final_list.append(COLORS_PALLETE["white"])
+            final_list+=separator
+        self.seqname.update(final_list)
 
     def updateCameraLabel(self):
         self.cameraname.setText(f"Camera: {self.hou_viewport.cameraName()}")
@@ -412,11 +473,13 @@ class DinoWriter(QtWidgets.QWidget):
             camera_res = self.hou_viewport.cameraResolution()
             self.resx.setText(str(camera_res[0]))
             self.resy.setText(str(camera_res[1]))
-        elif item == "50%":
+        elif item.find("/")!=-1:
+            divisible,divider = item.split("/")
+            ratio = int(divisible) / int(divider)
             resx = self.resx.text()
             resy = self.resy.text()
-            newresx = max(round(int(resx)/2), MIN_RESOLUTION_X)
-            newresy = max(round(int(resy)/2), MIN_RESOLUTION_Y)
+            newresx = max(round(int(resx)*ratio), MIN_RESOLUTION_X)
+            newresy = max(round(int(resy)*ratio), MIN_RESOLUTION_Y)
             self.resx.setText(str(newresx))
             self.resy.setText(str(newresy))
         else:
@@ -448,7 +511,8 @@ class DinoWriter(QtWidgets.QWidget):
         self.ramusage.setText(ramtext)
 
     def flipbooks_menu(self):
-        pfolder = Path(hou.text.expandString(self.paths.get("fb_folder")).format(name=self.data.get("name"))).resolve().parent
+        fb_folder_raw = hou.text.expandString(self.paths.get("fb_folder")).format(name=self.data.get("name"))
+        pfolder = Path(fb_folder_raw).resolve().parent
 
         if not pfolder.exists():
             if not hou.ui.displayMessage(f"{self.paths.get('fb_folder')}\nNo folder found\nWanna create it?",buttons=("Yes","No")):

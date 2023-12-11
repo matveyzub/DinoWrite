@@ -1,6 +1,6 @@
 {
     "paths":{
-        "fb_folder":  "$HIP/../preview/{name}",
+        "fb_folder":  "$HIP/preview/{name}",
         "fb_name":    "{name}.{version}.$F4.{fileformat}",
         "tmp_folder": "$TEMP/houdini_temp/flipbook_writer",
         "tmp_data":   "data.json",

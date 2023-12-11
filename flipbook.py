@@ -6,6 +6,7 @@ from .utils import utils
 import subprocess
 import hou
 import json
+import webbrowser as wb
 
 reload(utils)
 
@@ -81,7 +82,7 @@ def start(data,kwargs):
 
     # #Open dir
     if data.get("openfolder"):
-        subprocess.Popen(['explorer', write_folder.as_uri()])
+        wb.open(write_folder.as_uri())
 
     # Correcting resolution for mpeg4 codec
     if data.get("convertvideo"):

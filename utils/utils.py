@@ -6,7 +6,9 @@ from os import environ as osenviron
 import random
 import shutil
 
-from PySide2.QtGui import QIcon
+from PySide2.QtWidgets import *
+from PySide2.QtGui import *
+from PySide2.QtCore import *
 
 def logger(message:str,length="auto") -> None:
     """Simple console logger
@@ -129,7 +131,7 @@ class FFmpeg:
     def convert_to_video(self, fps=24, resolution="1920x1080", aspect=1, start_frame=1001, input="", output="", delete_input=False):
         ffmpeg_cmd = self.cmd(fps=fps, resolution=resolution, aspect=aspect,
                             start_frame=start_frame, input=input, output=output)
-
+        
         folder = Path(input).parent
         if folder.exists():
             files = [x for x in folder.iterdir()]
@@ -251,7 +253,6 @@ class FileParser:
         else:
             ver_str = "v001"
         return ver_str
-        
 
 class Icons:
     def __init__(self) -> None:
