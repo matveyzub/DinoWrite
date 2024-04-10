@@ -47,10 +47,10 @@ There are a bunch of little tips that I use in my daily workflow to make it easi
 3. Create ShelfTool with following code:
 
 ```
-from flipbook_writer import ui
+from DinoWrite import ui
 ui.DinoWriter(kwargs)
 ```
-Pay attention that `flipbook_writer` is name of the folder that you copied to the python lib folder
+Pay attention that `DinoWrite` is name of the folder that you copied to the python lib folder
 
 ### Credits
 - Alexander Marchenko
