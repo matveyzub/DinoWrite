@@ -3,6 +3,8 @@ Write flipbooks to disk easily
 
 This is a fully Python tool that allows you to write flipbooks in Houdini
 
+![Alt text](https://i.imgur.com/fViOjuG.png "DinoWriter")
+
 ## Features
 ---
  - Open source with comprehensive explanations
@@ -31,9 +33,6 @@ There are a bunch of little tips that I use in my daily workflow to make it easi
 - By default, after converting sequence to video, script delete sequence files (which can also be disabled in `settings.json`)  
 - By default, sequences are written in native pixel aspect, but Houdini flipbooks cannot handle that with the original resolution. It can be fixed in Nuke via the reformat node. But ffmpeg conversion handles pixel aspect and gives you the correct image (which can also be modified in `settings.json`)
 
-### Dependencies
----
-- ffmpeg installed and be in your system envs
 ## Installation 
 ---
 1. Download source files 
@@ -45,18 +44,14 @@ There are a bunch of little tips that I use in my daily workflow to make it easi
 | linux | $HOME/houdini%.% |
 | mac | /Users/%USERNAME%/Library/Preferences/houdini%.% |
 
-#### Tested
----
+3. Create ShelfTool with following code:
 
-| Version     | win | linux | mac |
-| ----------- | ----------- |----------- | ----------- | 
-| 19.5.403 - 3.9py     |+|
-| Paragraph   | Text        | 
+```
+from flipbook_writer import ui
+ui.DinoWriter(kwargs)
+```
+Pay attention that `flipbook_writer` is name of the folder that you copied to the python lib folder
 
-#### Credits 
----
-- 
-
-#### Attributions 
----
-- 
+### Credits
+- Alexander Marchenko
+- Alexandra Ushakova
