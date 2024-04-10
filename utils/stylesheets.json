@@ -1,18 +1,14 @@
 {
-    "README":"adjust fonts,size,colors",
-
     "main":{
         "font":"Verdana",
-        "fontsize":10
+        "fontsize":11
     },
-
     "label":{
         "QLabel":[
             "background-color: transparent;",
             "color: #ffffff;"
         ]
     },
-
     "lineedit":{
         "QLineEdit":[
             "background-color: #131313;",
@@ -21,33 +17,67 @@
             "border-radius: 2px;",
             "padding: 3px;",
             "padding-left: 5px;"
+        ],
+        "QLineEdit::hover":[
+            "border: 1px solid #5a4210;"
+        ],
+        "QLineEdit::focus":[
+            "border: 1px solid #b78620;"
         ]
     },
-    
     "button":{
         "QPushButton":[
+            "image: url(icons:angle-down2.svg);",
             "background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(84, 84, 84, 255),stop:1 rgba(59, 59, 59, 255));",
             "color: #ffffff;",
             "border-style: solid;",
             "border-width: 1px;",
-            "border-radius: 3px;",
+            "border-radius: 5px;",
             "border-color: #202020;",
-            "padding: 5px;"],
-
+            "padding: 5px;"
+        ],
+        "QPushButton::menu-indicator":[
+            "image: none;"
+        ],
         "QPushButton::hover":[
             "background-color: rgba(183, 134, 32, 20%);",
-            "border: 1px solid #b78620;"],
-
+            "border: 1px solid #b78620;"
+        ],
         "QPushButton::pressed":[
             "background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(74, 74, 74, 255),stop:1 rgba(49, 49, 49, 255));",
-            "border: 1px solid #b78620;"],
-
+            "border: 1px solid #b78620;"
+        ],
         "QPushButton::checked":[
             "background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(74, 74, 74, 255),stop:1 rgba(49, 49, 49, 255));",
             "border: 1px solid #222;"
         ]
     },
-
+    "mainbutton":{
+        "QPushButton":[
+            "background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(84, 84, 84, 255),stop:1 rgba(59, 59, 59, 255));",
+            "color: #ffffff;",
+            "border-style: solid;",
+            "border-width: 1px;",
+            "border-radius: 5px;",
+            "border-color: #202020;",
+            "padding: 5px;"
+        ],
+        "QPushButton::menu-indicator":[
+            "image: none;"
+        ],
+        "QPushButton::hover":[
+            "background-color: rgba(183, 134, 32, 20%);",
+            "border: 1px solid #b78620;"
+        ],
+        "QPushButton::pressed":[
+            "background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(74, 74, 74, 255),stop:1 rgba(49, 49, 49, 255));",
+            "border: 1px solid #b78620;"
+        ],
+        "QPushButton::checked":[
+            "background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(74, 74, 74, 255),stop:1 rgba(49, 49, 49, 255));",
+            "border: 1px solid #222;"
+        ]
+    },
     "menu":{
         "QMenu":[
             "background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(57, 57, 57, 255),stop:1 rgba(50, 50, 50, 255));",
@@ -55,23 +85,19 @@
             "padding: 4px;",
             "color: #fff;"
         ],
-
         "QMenu::item":[
             "background-color: transparent;",
             "padding: 2px 20px 2px 20px;"
         ],
-
         "QMenu::separator":[
             "background-color: rgb(183, 134, 32);",
             "height: 1px;"
         ],
-
         "QMenu::item:disabled":[
             "color: #555;",
             "background-color: transparent;",
             "padding: 2px 20px 2px 20px;"
         ],
-
         "QMenu::item:selected":[
             "background-color: rgba(183, 134, 32, 20%);",
             "border: 1px solid #b78620;",
@@ -79,7 +105,6 @@
             
         ]
     },
-
     "combobox":{
         "QComboBox":[
             "background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(84, 84, 84, 255),stop:1 rgba(59, 59, 59, 255));",
@@ -90,6 +115,22 @@
             "background-color: #b78620;",
             "color: #000;"
         ],
+        "QComboBox:drop-down":[
+            "image: none;"
+        ],
+        "QComboBox:down-arrow":[
+            "image: url(icons:angle-down2.svg);",
+            "width: 14px;",
+            "height: 14px;"
+        ],
+        "QComboBox:disabled":[
+            "background-color: #383838;",
+            "color: #2a2a2a;"
+        ],
+        "QComboBox:hover":[
+            "background-color: rgba(183, 134, 32, 20%);",
+            "border: 1px solid #5a4210;"
+        ],
         "QComboBox QAbstractItemView":[
             "background-color: #383838;",
             "color: #ffffff;",
@@ -98,33 +139,25 @@
             "outline: 0;"
         ]
     },
-
     "checkbox":{
         "QCheckBox":[
             "background-color: transparent;",
             "color: lightgray;",
             "border: none;"
         ],
+        "QCheckBox:hover":[
+            "background-color: rgba(183, 134, 32, 20%);"
+        ],
         "QCheckBox::indicator":[
             "background-color: #323232;",
-            "border: 1px solid darkgray;",
-            "width: 12px;",
-            "height: 12px;"
+            "width: 20px;",
+            "height: 20px;"
         ],
         "QCheckBox::indicator:checked":[
-            "background-color: #b78620;",
-            "border: 1px solid #3a546e;"
+            "image: url(icons:square-check.svg);"
         ],
-        "QCheckBox::indicator:unchecked:hover":[
-            "border: 1px solid #b78620;"
-        ],
-        "QCheckBox::disabled":[
-            "color: #656565;"
-        ],
-        "QCheckBox::indicator:disabled":[
-            "background-color: #656565;",
-            "color: #656565;",
-            "border: 1px solid #656565;"
+        "QCheckBox::indicator:unchecked":[
+            "image: url(icons:square-minus.svg);"
         ]
     }
 }

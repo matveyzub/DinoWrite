@@ -1,7 +1,51 @@
 {
-    "fb_name":   "{name}.{version}.$F4.{fileformat}",
-    "fb_video_ext": "mov",
-    "fb_folder":  "$JOB/$ACTIVITY/prerender/$CEREBRO_USER_NAME/{name}",
-    "tmp_folder": "$TEMP/houdini_temp/flipbook_writer",
-    "tmp_data":   "data.json"
+    "paths":{
+        "fb_folder":  "$HIP/../preview/{name}",
+        "fb_name":    "{name}.{version}.$F4.{fileformat}",
+        "tmp_folder": "$TEMP/houdini_temp/flipbook_writer",
+        "tmp_data":   "data.json",
+        "fb_video_ext": "mov"
+    },
+    "formats":{
+        "video_exts": ["mov","mp4"],
+        "pic_exts":   ["exr","jpg","png"]
+    },
+    "custom_resolution":[
+        "3840 2160",
+        "2048 1080",
+        "2048 800",
+        "1920 1080",
+        "1280 720"
+    ],
+    "custom_framerange":{
+        "From Current Frame To Global End": "$F $FEND",
+        "From Global Start To Current Frame": "$FSTART $F",
+        "From Current Frame To Playbar End": "$F $RFEND",
+        "From Playbar Start To Current Frame": "$RFSTART $F"
+    },
+    "ffmpeg_cmd":[
+        "ffmpeg",
+        "-y",
+        "-colorspace bt709",
+        "-r {fps}",
+        "-start_number {start_frame}",
+        "-i {input}",
+        "-s {resolution}",
+        "-aspect {aspect}",
+        "-c:v libx264",
+        "-crf 15",
+        "-pix_fmt yuv420p",
+        "-preset slow",
+        "{output}"
+    ],
+    "advanced":{
+        "delete_incomplete_fb":false,
+        "conversion_delete_input_sequence":true,
+        "aspect_affects_resolution":false,
+        "metadata":[
+            "author:$CEREBRO_USER_NAME",
+            "hipname:$HIPNAME",
+            "hipfile:{hipfile}"
+        ]
+    }
 }
